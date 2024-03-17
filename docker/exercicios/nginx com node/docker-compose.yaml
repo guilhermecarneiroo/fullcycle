@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+
+  app:
+    build:
+      context: node
+    container_name: app
+    networks:
+      - node-network
+    volumes:
+      - ./node:/usr/src/app
+    tty: true
+    ports:
+      - "3000:3000"
+    depends_on:
+      - wait-for-db
+    command: ["./wait-for-it.sh", "db:3306", "--", "node", "index.js"]
+
+  db:
+    platform: linux/x86_64
+    image: mysql:5.7
+    command: --innodb-use-native-aio=0
+    container_name: db
+    restart: always
+    tty: true
+    volumes:
+      - ./mysql:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=nodedb
+      - MYSQL_ROOT_PASSWORD=root
+    networks:
+      - node-network
+
+  wait-for-db:
+    image: alpine:latest
+    command: ["./wait-for-it.sh", "db:3306", "--", "sleep", "10"]
+    depends_on:
+      - db
+    volumes:
+      - ./node/wait-for-it.sh:/wait-for-it.sh
+    restart: "no"
+
+  nginx:
+    platform: linux/x86_64
+    image: wesleywillians/nginx-fullcycle:latest
+    container_name: nginx
+    networks:
+      - node-network
+    ports:
+      - "8081:80"
+    depends_on:
+      - app
+
+networks:
+  node-network:
+    driver: bridge
